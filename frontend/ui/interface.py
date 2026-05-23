@@ -8,6 +8,7 @@ from frontend.services.predictor import Predictor
 from frontend.services.severity import SeverityAnalyzer
 from frontend.services.diagnostic_message import DiagnosticMessage
 from frontend.data.recommendations import RecommendationEngine
+from frontend.services.leaf_detector import LeafDetector
 
 class AgroVisionUI:
 
@@ -265,6 +266,55 @@ class AgroVisionUI:
 
         self.loading_label.configure(text="Analizando imagen con IA...")
         time.sleep(1.5)
+
+        if not LeafDetector.is_leaf(self.img_path):
+            self.result_title.configure(
+                text="Imagen no válida",
+                text_color="#ef4444"
+            )
+
+            self.confidence_bar.set(0)
+
+            self.confidence_label.configure(
+                text="0%"
+            )
+
+            self.severity_label.configure(
+                text="Sin diagnóstico",
+                text_color="#ef4444"
+            )
+
+            self.recommendation_box.delete(
+                "0.0",
+                "end"
+            )
+
+            self.recommendation_box.insert(
+                "0.0",
+                "La imagen analizada no parece "
+                "corresponder a una hoja vegetal "
+                "compatible con AgroVisionIA."
+            )
+
+            self.message_box.delete(
+                "0.0",
+                "end"
+            )
+
+            self.message_box.insert(
+                "0.0",
+                "No se detectaron patrones "
+                "visuales compatibles con hojas "
+                "utilizadas durante el entrenamiento "
+                "del modelo."
+            )
+
+            self.loading_label.configure(
+                text=""
+            )
+
+            return
+
 
         result = self.predictor.predict(self.img_path)
         level, color, damage_percentage = SeverityAnalyzer.calculate(
