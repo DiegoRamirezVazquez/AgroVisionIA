@@ -1,8 +1,8 @@
 import customtkinter as ctk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from PIL import Image
 import threading
-import time
+import os
 
 from frontend.services.predictor import Predictor
 from frontend.services.severity import SeverityAnalyzer
@@ -14,8 +14,23 @@ class AgroVisionUI:
 
     def __init__(self, root):
         self.root = root
-        self.predictor = Predictor()
         self.img_path = None
+        self.img_tk = None
+        self.analyzing = False
+
+        # Intentar cargar el modelo con manejo de errores
+        try:
+            self.predictor = Predictor()
+        except Exception as e:
+            self.predictor = None
+            root.after(100, lambda: messagebox.showerror(
+                "Error de modelo",
+                f"No se pudo cargar el modelo de IA.\n\n"
+                f"Verifica que el archivo 'modelos/modelo_plantas.keras' "
+                f"exista y no esté corrupto.\n\n"
+                f"Detalle: {e}"
+            ))
+
         self.create_interface()
 
     def create_interface(self):
@@ -249,98 +264,193 @@ class AgroVisionUI:
 
     # SUBIR IMAGEN
     def upload_image(self):
-        self.img_path = filedialog.askopenfilename()
+        self.img_path = filedialog.askopenfilename(
+            filetypes=[
+                ("Imágenes", "*.jpg *.jpeg *.png *.bmp *.webp *.JPG *.JPEG *.PNG"),
+                ("Todos los archivos", "*.*")
+            ]
+        )
         if not self.img_path:
             return
 
-        img = Image.open(self.img_path)
-        img = img.resize((440, 420))
+        try:
+            img = Image.open(self.img_path)
+            img = img.resize((440, 420))
 
-        img_tk = ctk.CTkImage(light_image=img, dark_image=img, size=(440, 420))
-        self.image_label.configure(image=img_tk, text="")
+            self.img_tk = ctk.CTkImage(light_image=img, dark_image=img, size=(440, 420))
+            self.image_label.configure(image=self.img_tk, text="")
+        except Exception as e:
+            self.img_path = None
+            messagebox.showerror(
+                "Error al abrir imagen",
+                f"No se pudo abrir el archivo seleccionado.\n\n"
+                f"Asegúrate de que sea una imagen válida "
+                f"(JPG, PNG, BMP, WEBP).\n\n"
+                f"Detalle: {e}"
+            )
+
+    # ACTUALIZAR UI DESDE THREAD SEGURO
+    def _update_ui(self, callback):
+        self.root.after(0, callback)
 
     # ANALISIS
     def analyze(self):
         if not self.img_path:
             return
 
-        self.loading_label.configure(text="Analizando imagen con IA...")
-        time.sleep(1.5)
-
-        if not LeafDetector.is_leaf(self.img_path):
-            self.result_title.configure(
-                text="Imagen no válida",
-                text_color="#ef4444"
-            )
-
-            self.confidence_bar.set(0)
-
-            self.confidence_label.configure(
-                text="0%"
-            )
-
-            self.severity_label.configure(
-                text="Sin diagnóstico",
-                text_color="#ef4444"
-            )
-
-            self.recommendation_box.delete(
-                "0.0",
-                "end"
-            )
-
-            self.recommendation_box.insert(
-                "0.0",
-                "La imagen analizada no parece "
-                "corresponder a una hoja vegetal "
-                "compatible con AgroVisionIA."
-            )
-
-            self.message_box.delete(
-                "0.0",
-                "end"
-            )
-
-            self.message_box.insert(
-                "0.0",
-                "No se detectaron patrones "
-                "visuales compatibles con hojas "
-                "utilizadas durante el entrenamiento "
-                "del modelo."
-            )
-
-            self.loading_label.configure(
-                text=""
-            )
-
+        if self.analyzing:
             return
 
+        self.analyzing = True
 
-        result = self.predictor.predict(self.img_path)
-        level, color, damage_percentage = SeverityAnalyzer.calculate(
-            result["raw_label"], result["confidence"]
-        )
-        diagnostic_message = DiagnosticMessage.generate(
-            result["confidence"], level, damage_percentage
-        )
+        # Verificar que el modelo esté cargado
+        if self.predictor is None:
+            self._update_ui(lambda: messagebox.showerror(
+                "Modelo no disponible",
+                "El modelo de IA no se cargó correctamente.\n\n"
+                "Reinicia la aplicación y verifica que el archivo "
+                "'modelos/modelo_plantas.keras' exista."
+            ))
+            self.analyzing = False
+            return
 
-        # RESULTADOS
-        self.result_title.configure(text=result["label"])
-        self.confidence_bar.set(result["confidence"])
-        self.confidence_label.configure(text=f'{result["confidence"]:.2%}')
-        self.severity_label.configure(text=f"RIESGO {level}", text_color=color)
+        # Activar indicador de carga
+        self._update_ui(lambda: self.loading_label.configure(
+            text="Analizando imagen con IA..."
+        ))
+        self._update_ui(lambda: self.confidence_bar.configure(
+            mode="indeterminate"
+        ))
+        self._update_ui(lambda: self.confidence_bar.start())
 
-        # RECOMENDACIONES
-        recommendation = RecommendationEngine.generate(
-            result["raw_label"], result["confidence"], level
-        )
-        self.recommendation_box.delete("0.0", "end")
-        self.recommendation_box.insert("0.0", recommendation)
+        try:
 
-        # INTERPRETACION
-        self.message_box.delete("0.0", "end")
-        self.message_box.insert("0.0", diagnostic_message)
-        self.loading_label.configure(text="")
+            if not LeafDetector.is_leaf(self.img_path):
+
+                def show_invalid():
+                    self.confidence_bar.stop()
+                    self.confidence_bar.configure(mode="determinate")
+                    self.confidence_bar.set(0)
+
+                    self.result_title.configure(
+                        text="Imagen no válida",
+                        text_color="#ef4444"
+                    )
+
+                    self.confidence_label.configure(
+                        text="0%"
+                    )
+
+                    self.severity_label.configure(
+                        text="Sin diagnóstico",
+                        text_color="#ef4444"
+                    )
+
+                    self.recommendation_box.delete(
+                        "0.0",
+                        "end"
+                    )
+
+                    self.recommendation_box.insert(
+                        "0.0",
+                        "La imagen analizada no parece "
+                        "corresponder a una hoja vegetal "
+                        "compatible con AgroVisionIA."
+                    )
+
+                    self.message_box.delete(
+                        "0.0",
+                        "end"
+                    )
+
+                    self.message_box.insert(
+                        "0.0",
+                        "No se detectaron patrones "
+                        "visuales compatibles con hojas "
+                        "utilizadas durante el entrenamiento "
+                        "del modelo."
+                    )
+
+                    self.loading_label.configure(
+                        text=""
+                    )
+
+                self._update_ui(show_invalid)
+                return
+
+
+            result = self.predictor.predict(self.img_path)
+            level, color, damage_percentage = SeverityAnalyzer.calculate(
+                result["raw_label"], result["confidence"]
+            )
+            diagnostic_message = DiagnosticMessage.generate(
+                result["confidence"], level, damage_percentage
+            )
+
+            recommendation = RecommendationEngine.generate(
+                result["raw_label"], result["confidence"], level
+            )
+
+            def show_results():
+                self.confidence_bar.stop()
+                self.confidence_bar.configure(mode="determinate")
+
+                # RESULTADOS
+                self.result_title.configure(text=result["label"])
+                self.confidence_bar.set(result["confidence"])
+                self.confidence_label.configure(text=f'{result["confidence"]:.2%}')
+                self.severity_label.configure(text=f"RIESGO {level}", text_color=color)
+
+                # RECOMENDACIONES
+                self.recommendation_box.delete("0.0", "end")
+                self.recommendation_box.insert("0.0", recommendation)
+
+                # INTERPRETACION
+                self.message_box.delete("0.0", "end")
+                self.message_box.insert("0.0", diagnostic_message)
+                self.loading_label.configure(text="")
+
+            self._update_ui(show_results)
+
+        except Exception as e:
+
+            def show_error():
+                self.confidence_bar.stop()
+                self.confidence_bar.configure(mode="determinate")
+                self.confidence_bar.set(0)
+
+                self.result_title.configure(
+                    text="Error al procesar",
+                    text_color="#ef4444"
+                )
+
+                self.confidence_label.configure(text="0%")
+
+                self.severity_label.configure(
+                    text="Sin diagnóstico",
+                    text_color="#ef4444"
+                )
+
+                self.recommendation_box.delete("0.0", "end")
+                self.recommendation_box.insert(
+                    "0.0",
+                    f"Ocurrió un error durante el análisis de la imagen.\n\n"
+                    f"Detalle: {e}"
+                )
+
+                self.message_box.delete("0.0", "end")
+                self.message_box.insert(
+                    "0.0",
+                    "Intenta subir una imagen diferente o "
+                    "reinicia la aplicación."
+                )
+
+                self.loading_label.configure(text="")
+
+            self._update_ui(show_error)
+
+        finally:
+            self.analyzing = False
 
     def predict_image(self):
         threading.Thread(target=self.analyze).start()

@@ -58,8 +58,9 @@ class DiagnosticMessage:
             severity_text = (
 
                 f"Se observan indicios leves "
-                f"de afectación foliar "
-                f"aproximados del {damage:.1f}%."
+                f"de afectación foliar, con un nivel "
+                f"estimado del {damage:.1f}% "
+                f"(valor referencial según categoría)."
             )
 
         elif severity == "MEDIO":
@@ -67,8 +68,9 @@ class DiagnosticMessage:
             severity_text = (
 
                 f"La hoja presenta síntomas "
-                f"moderados de afectación visual "
-                f"aproximados del {damage:.1f}%."
+                f"moderados de afectación visual, con un nivel "
+                f"estimado del {damage:.1f}% "
+                f"(valor referencial según categoría)."
             )
 
         elif severity == "ALTO":
@@ -76,8 +78,9 @@ class DiagnosticMessage:
             severity_text = (
 
                 f"Se identifican daños importantes "
-                f"en la superficie foliar "
-                f"aproximados del {damage:.1f}%."
+                f"en la superficie foliar, con un nivel "
+                f"estimado del {damage:.1f}% "
+                f"(valor referencial según categoría)."
             )
 
         else:
@@ -85,8 +88,9 @@ class DiagnosticMessage:
             severity_text = (
 
                 f"La hoja presenta una afectación "
-                f"visual crítica aproximada "
-                f"del {damage:.1f}%."
+                f"visual crítica, con un nivel "
+                f"estimado del {damage:.1f}% "
+                f"(valor referencial según categoría)."
             )
 
         # ============================================

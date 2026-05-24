@@ -2,6 +2,8 @@ import tensorflow as tf
 from tensorflow.keras.preprocessing import image
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+import os
 
 # =========================
 # CARGAR MODELO
@@ -51,7 +53,17 @@ class_names = [
     'Tomato___healthy'
 ]
 
-img_path = "../test_images/strawberry_LS.JPG"
+# =========================
+# RUTA DE IMAGEN
+# =========================
+if len(sys.argv) > 1:
+    img_path = sys.argv[1]
+else:
+    img_path = "../test_images/strawberry_LS.JPG"
+
+if not os.path.exists(img_path):
+    print(f"Error: No se encontró la imagen '{img_path}'")
+    sys.exit(1)
 
 # =========================
 # CONFIGURACIÓN

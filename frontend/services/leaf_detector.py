@@ -45,16 +45,56 @@ class LeafDetector:
         # =====================================================
         # MASCARA VERDE
         # =====================================================
-        mask = cv2.inRange(
+        mask_green = cv2.inRange(
             hsv,
             lower_green,
             upper_green
         )
 
         # =====================================================
-        # PORCENTAJE VERDE
+        # RANGO AMARILLO (hojas enfermas/secas)
         # =====================================================
-        green_pixels = cv2.countNonZero(
+        lower_yellow = np.array(
+            [15, 40, 40]
+        )
+
+        upper_yellow = np.array(
+            [25, 255, 255]
+        )
+
+        mask_yellow = cv2.inRange(
+            hsv,
+            lower_yellow,
+            upper_yellow
+        )
+
+        # =====================================================
+        # RANGO MARRÓN (hojas muy afectadas)
+        # =====================================================
+        lower_brown = np.array(
+            [8, 30, 30]
+        )
+
+        upper_brown = np.array(
+            [20, 200, 180]
+        )
+
+        mask_brown = cv2.inRange(
+            hsv,
+            lower_brown,
+            upper_brown
+        )
+
+        # =====================================================
+        # COMBINAR MASCARAS
+        # =====================================================
+        mask = cv2.bitwise_or(mask_green, mask_yellow)
+        mask = cv2.bitwise_or(mask, mask_brown)
+
+        # =====================================================
+        # PORCENTAJE FOLIAR
+        # =====================================================
+        leaf_pixels = cv2.countNonZero(
             mask
         )
 
@@ -63,14 +103,14 @@ class LeafDetector:
             * img.shape[1]
         )
 
-        green_percentage = (
-            green_pixels / total_pixels
+        leaf_percentage = (
+            leaf_pixels / total_pixels
         ) * 100
 
         # =====================================================
-        # SI HAY MUY POCO VERDE
+        # SI HAY MUY POCO COLOR FOLIAR
         # =====================================================
-        if green_percentage < 12:
+        if leaf_percentage < 12:
 
             return False
 

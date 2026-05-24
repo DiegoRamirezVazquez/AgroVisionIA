@@ -16,6 +16,10 @@ class Predictor:
             "modelos/modelo_plantas.keras"
         )
 
+    def is_loaded(self):
+
+        return self.model is not None
+
     def predict(self, img_path):
 
         img = image.load_img(
