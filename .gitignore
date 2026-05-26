@@ -48,3 +48,7 @@ tempCodeRunnerFile.py
 # ----- OS files -----
 Thumbs.db
 .DS_Store
+
+# ----- Dataset de entrenamiento -----
+# No versionar imágenes (miles de JPG, varios GB)
+dataset/
